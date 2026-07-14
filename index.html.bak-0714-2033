@@ -1,0 +1,1486 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X-OS 3.0</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=VT323&family=Pixelify+Sans:wght@400;700&display=swap');
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+:root {
+  --platinum: #c0c0c0;
+  --platinum-light: #dddddd;
+  --platinum-dark: #808080;
+  --platinum-darker: #404040;
+  --text: #00ff41;
+  --text-dim: #555;
+  --highlight: #ffff00;
+  --ai-color: #00d4ff;
+}
+
+body {
+  background: #555;
+  font-family: 'Pixelify Sans', 'Geneva', sans-serif;
+  height: 100vh;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* ═══ CRT Boot Screen ═══ */
+#crt-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#crt-overlay.crt-off {
+  background: #000;
+}
+
+/* Scanlines */
+#crt-scanlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10002;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 1px,
+    rgba(0,0,0,0.15) 1px,
+    rgba(0,0,0,0.15) 2px
+  );
+}
+
+/* Vignette */
+#crt-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10003;
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.6) 100%);
+}
+
+/* CRT glow */
+#crt-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10001;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+/* The horizontal beam line */
+#crt-beam {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #fff;
+  box-shadow: 0 0 40px 10px rgba(255,255,255,0.8),
+              0 0 80px 20px rgba(255,255,255,0.4);
+  transform: translateY(-50%) scaleX(0);
+  z-index: 10004;
+  opacity: 0;
+}
+
+/* Apple logo + text */
+#crt-logo-group {
+  position: absolute;
+  z-index: 10005;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  opacity: 0;
+  gap: 8px;
+}
+
+#crt-logo-group .apple-logo {
+  font-size: 80px;
+  color: #fff;
+  text-shadow: 0 0 20px rgba(255,255,255,0.5);
+}
+
+#crt-logo-group .xos-text {
+  font-family: 'VT323', monospace;
+  font-size: 28px;
+  color: #fff;
+  letter-spacing: 8px;
+  text-shadow: 0 0 10px rgba(255,255,255,0.5);
+}
+
+/* White flash */
+#crt-flash {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  opacity: 0;
+  z-index: 10006;
+  pointer-events: none;
+}
+
+/* CRT flicker */
+@keyframes crtFlicker {
+  0% { opacity: 1; }
+  5% { opacity: 0.8; }
+  10% { opacity: 1; }
+  15% { opacity: 0.9; }
+  20% { opacity: 1; }
+  100% { opacity: 1; }
+}
+
+/* ═══ Menu Bar ═══ */
+#menubar {
+  height: 24px;
+  background: var(--platinum);
+  border-bottom: 2px solid var(--platinum-darker);
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+}
+.menu-apple { font-size: 16px; padding: 2px 8px; }
+.menu-item {
+  padding: 2px 12px;
+  font-size: 13px;
+  color: #000;
+  cursor: pointer;
+  border-radius: 3px;
+}
+.menu-item:hover { background: #000080; color: #fff; }
+.menu-right { margin-left: auto; font-size: 11px; color: #333; }
+
+/* ═══ Desktop ═══ */
+#desktop {
+  width: 100%;
+  height: calc(100vh - 24px - 28px);
+  position: relative;
+  background: #555;
+}
+
+/* ═══ Mac Window ═══ */
+.mac-window {
+  position: absolute;
+  background: #0a0a12;
+  border: 2px solid var(--platinum-darker);
+  box-shadow: 2px 2px 0 #000;
+  display: none;
+  min-width: 300px;
+  min-height: 200px;
+}
+.mac-window.active { display: flex; flex-direction: column; }
+
+.mac-titlebar {
+  height: 22px;
+  background: repeating-linear-gradient(
+    to bottom, var(--platinum) 0px, var(--platinum) 2px,
+    var(--platinum-darker) 2px, var(--platinum-darker) 3px
+  );
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--platinum-darker);
+  cursor: move;
+}
+.mac-close-box {
+  width: 14px; height: 14px;
+  border: 1px solid #000;
+  background: var(--platinum);
+  margin: 0 4px 0 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+  z-index: 1;
+}
+.mac-close-box:hover { background: #000; }
+.mac-title-text {
+  flex: 1;
+  text-align: center;
+  font-size: 12px;
+  font-weight: bold;
+  color: #000;
+  position: relative;
+  z-index: 1;
+}
+
+/* ═══ Terminal ═══ */
+.term-content {
+  background: #000;
+  color: var(--text);
+  font-family: 'VT323', monospace;
+  font-size: 15px;
+  padding: 8px;
+  flex: 1;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  scrollbar-width: thin;
+  scrollbar-color: #00ff41 #111;
+}
+.term-content::-webkit-scrollbar { width: 8px; }
+.term-content::-webkit-scrollbar-track { background: #111; }
+.term-content::-webkit-scrollbar-thumb { background: #00ff41; border: 1px solid #000; }
+
+.t-line { margin: 2px 0; }
+.t-system { color: #555; }
+.t-input { color: var(--text); }
+.t-output { color: #aaa; }
+.t-highlight { color: var(--highlight); }
+.t-error { color: #ff5f56; }
+.t-ascii { color: var(--text); opacity: 0.7; }
+
+/* AI response styles */
+.t-ai {
+  color: var(--ai-color);
+  border-left: 2px solid var(--ai-color);
+  padding-left: 8px;
+  margin: 4px 0;
+}
+
+.t-ai-thinking {
+  color: var(--ai-color);
+  opacity: 0.6;
+  font-style: italic;
+}
+
+.term-input-area {
+  background: var(--platinum);
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  border-top: 1px solid var(--platinum-darker);
+}
+.term-input-area span { color: #000; font-family: 'VT323', monospace; font-size: 15px; margin-right: 6px; }
+.term-input-area input {
+  background: transparent; border: none; color: #000;
+  font-family: 'VT323', monospace; font-size: 15px; flex: 1; outline: none;
+}
+
+/* ═══ Copy Button ═══ */
+.copy-btn {
+  display: inline-block;
+  margin: 8px 0;
+  padding: 6px 16px;
+  background: #000080;
+  color: #fff;
+  border: 2px outset var(--platinum-light);
+  font-family: 'Pixelify Sans', sans-serif;
+  font-size: 12px;
+  cursor: pointer;
+}
+.copy-btn:active { border-style: inset; }
+.copy-btn:hover { background: #0000aa; }
+.copy-btn.copied { background: #006600; }
+
+/* ═══ Notepad ═══ */
+.notepad-bg {
+  background: #fff; color: #000;
+  font-family: 'Geneva', sans-serif;
+  font-size: 12px; line-height: 1.6;
+  padding: 12px; flex: 1; overflow-y: auto;
+}
+.notepad-bg::-webkit-scrollbar { width: 16px; }
+.notepad-bg::-webkit-scrollbar-track { 
+  background: repeating-conic-gradient(var(--platinum) 0% 25%, #fff 0% 50%) 50% / 2px 2px; 
+}
+.notepad-bg::-webkit-scrollbar-thumb { background: var(--platinum); border: 1px solid #000; }
+
+/* ═══ Desktop Icons ═══ */
+.mac-icon {
+  position: absolute;
+  width: 75px;
+  text-align: center;
+  cursor: pointer;
+  padding: 4px;
+}
+.mac-icon:hover .mac-icon-img { opacity: 0.8; }
+.mac-icon .mac-icon-img {
+  width: 32px; height: 32px;
+  margin: 0 auto 4px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px;
+}
+.mac-icon .mac-icon-label {
+  font-size: 11px; color: #fff;
+  text-shadow: 1px 1px 0 #000;
+}
+
+/* ═══ Taskbar ═══ */
+#taskbar {
+  height: 28px;
+  background: var(--platinum);
+  border-top: 2px solid var(--platinum-light);
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  gap: 4px;
+}
+.taskbar-btn {
+  padding: 3px 10px;
+  background: var(--platinum);
+  border: 1px solid var(--platinum-darker);
+  font-family: 'Pixelify Sans', sans-serif;
+  font-size: 11px;
+  cursor: pointer; color: #000;
+}
+.taskbar-btn:hover { background: var(--platinum-light); }
+#taskbar-time { margin-left: auto; font-size: 11px; color: #333; }
+
+/* ═══ Toast ═══ */
+#toast {
+  position: fixed;
+  bottom: 50px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #000;
+  color: #00ff41;
+  font-family: 'VT323', monospace;
+  font-size: 14px;
+  padding: 10px 20px;
+  border: 1px solid #00ff41;
+  display: none;
+  z-index: 9999;
+}
+#toast.show { display: block; animation: fadeInOut 2s forwards; }
+@keyframes fadeInOut {
+  0% { opacity: 0; }
+  10% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ═══ API Dialog (Mac OS style) ═══ */
+#api-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 5000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+#api-dialog-overlay.show { display: flex; }
+
+#api-dialog {
+  background: var(--platinum);
+  border: 2px outset var(--platinum-light);
+  box-shadow: 4px 4px 0 #000;
+  width: 420px;
+  max-width: 90vw;
+  font-family: 'Pixelify Sans', sans-serif;
+}
+
+#api-dialog .dialog-titlebar {
+  height: 22px;
+  background: repeating-linear-gradient(
+    to bottom, #000080 0px, #000080 2px,
+    #0000aa 2px, #0000aa 3px
+  );
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  cursor: default;
+}
+#api-dialog .dialog-titlebar span {
+  flex: 1;
+  text-align: center;
+  color: #fff;
+  font-size: 12px;
+  font-weight: bold;
+}
+#api-dialog .dialog-close {
+  width: 14px; height: 14px;
+  border: 1px solid #fff;
+  background: var(--platinum);
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: bold;
+  color: #000;
+}
+#api-dialog .dialog-close:hover { background: #ff5f56; color: #fff; }
+
+#api-dialog .dialog-body {
+  padding: 16px;
+}
+
+#api-dialog label {
+  display: block;
+  font-size: 12px;
+  color: #000;
+  margin-bottom: 4px;
+  font-weight: bold;
+}
+
+#api-dialog select,
+#api-dialog input[type="text"],
+#api-dialog input[type="password"] {
+  width: 100%;
+  padding: 4px 6px;
+  font-family: 'VT323', monospace;
+  font-size: 14px;
+  border: 2px inset var(--platinum-dark);
+  background: #fff;
+  color: #000;
+  margin-bottom: 10px;
+  outline: none;
+}
+
+#api-dialog select {
+  background: #fff;
+}
+
+#api-dialog .dialog-row {
+  display: flex;
+  gap: 8px;
+}
+#api-dialog .dialog-row > div { flex: 1; }
+
+#api-dialog .dialog-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--platinum-dark);
+}
+
+#api-dialog .dialog-btn {
+  padding: 4px 20px;
+  font-family: 'Pixelify Sans', sans-serif;
+  font-size: 12px;
+  border: 2px outset var(--platinum-light);
+  background: var(--platinum);
+  color: #000;
+  cursor: pointer;
+}
+#api-dialog .dialog-btn:active { border-style: inset; }
+#api-dialog .dialog-btn.primary {
+  background: #000080;
+  color: #fff;
+}
+#api-dialog .dialog-btn.primary:hover { background: #0000aa; }
+
+/* ═══ Terminal connected mode ═══ */
+.term-input-area.connected span {
+  color: #000080;
+  font-weight: bold;
+}
+
+/* ═══ Responsive ═══ */
+@media (max-width: 600px) {
+  .mac-window {
+    min-width: 90vw !important;
+    left: 5vw !important;
+  }
+  #win-terminal { width: 90vw !important; height: 60vh !important; }
+  .menu-item { padding: 2px 6px; font-size: 11px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ CRT Boot Screen ═══ -->
+<div id="crt-overlay">
+  <div id="crt-scanlines"></div>
+  <div id="crt-vignette"></div>
+  <div id="crt-glow"></div>
+  <div id="crt-beam"></div>
+  <div id="crt-logo-group">
+    <div class="apple-logo">&#63743;</div>
+    <div class="xos-text">X-OS</div>
+  </div>
+  <div id="crt-flash"></div>
+</div>
+
+<!-- ═══ Menu Bar ═══ -->
+<div id="menubar" style="opacity:0">
+  <span class="menu-apple">&#63743;</span>
+  <span class="menu-item">File</span>
+  <span class="menu-item">Edit</span>
+  <span class="menu-item">View</span>
+  <span class="menu-item">Special</span>
+  <span class="menu-right" id="menubar-time"></span>
+</div>
+
+<!-- ═══ Desktop ═══ -->
+<div id="desktop" style="opacity:0">
+  <div class="mac-icon" style="left:30px;top:20px" ondblclick="openWindow('readme')">
+    <div class="mac-icon-img">📄</div>
+    <div class="mac-icon-label">README</div>
+  </div>
+  <div class="mac-icon" style="left:30px;top:100px" ondblclick="openWindow('about')">
+    <div class="mac-icon-img">👤</div>
+    <div class="mac-icon-label">关于X</div>
+  </div>
+  <div class="mac-icon" style="left:30px;top:180px" ondblclick="openWindow('terminal')">
+    <div class="mac-icon-img">🖥️</div>
+    <div class="mac-icon-label">终端</div>
+  </div>
+
+  <!-- README -->
+  <div class="mac-window" id="win-readme" style="left:140px;top:20px;width:440px;height:340px">
+    <div class="mac-titlebar" onmousedown="startDrag(event,'win-readme')">
+      <div class="mac-close-box" onclick="closeWindow('readme')"></div>
+      <span class="mac-title-text">README</span>
+    </div>
+    <div class="notepad-bg">
+X-OS 3.0 — 系统说明
+══════════════════════
+
+欢迎使用 X-OS。
+
+这个系统属于一个叫X的人。
+他在2024年3月消失了。
+但他留下了这个系统，和一些...碎片。
+
+使用方法：
+• 双击图标打开文件
+• 打开终端输入命令
+• 探索这个系统，你会发现一些东西
+
+提示：
+在终端输入 help 看看你能做什么。
+    </div>
+  </div>
+
+  <!-- About X -->
+  <div class="mac-window" id="win-about" style="left:200px;top:60px;width:380px;height:300px">
+    <div class="mac-titlebar" onmousedown="startDrag(event,'win-about')">
+      <div class="mac-close-box" onclick="closeWindow('about')"></div>
+      <span class="mac-title-text">关于X</span>
+    </div>
+    <div class="notepad-bg">
+关于X
+══════════════════════
+
+X是一个喜欢创造的人。
+
+他相信：
+• 图片可以藏秘密
+• 穿搭可以说话
+• 声音有形状
+
+他做了三个工具：
+1. REDSecret — 图片隐写
+2. MelodyDress — 穿搭弹琴
+3. ToneCanvas — 频谱画
+
+然后，他消失了。
+    </div>
+  </div>
+
+  <!-- Terminal -->
+  <div class="mac-window active" id="win-terminal" style="left:180px;top:80px;width:580px;height:420px">
+    <div class="mac-titlebar" onmousedown="startDrag(event,'win-terminal')">
+      <div class="mac-close-box" onclick="closeWindow('terminal')"></div>
+      <span class="mac-title-text" id="term-title">终端 — X-OS 3.0</span>
+    </div>
+    <div style="display:flex;flex-direction:column;flex:1;min-height:0">
+      <div class="term-content" id="term-output"></div>
+      <div class="term-input-area" id="term-input-area">
+        <span id="term-prompt">$&gt;</span>
+        <input type="text" id="cmd-input" placeholder="输入 help 查看命令..." autofocus>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Taskbar ═══ -->
+<div id="taskbar" style="opacity:0">
+  <button class="taskbar-btn" onclick="openWindow('terminal')">🖥️ 终端</button>
+  <button class="taskbar-btn" onclick="openWindow('readme')">📄 README</button>
+  <button class="taskbar-btn" onclick="openWindow('about')">👤 关于X</button>
+  <span id="taskbar-time"></span>
+</div>
+
+<div id="toast"></div>
+
+<!-- ═══ API Dialog ═══ -->
+<div id="api-dialog-overlay">
+  <div id="api-dialog">
+    <div class="dialog-titlebar">
+      <div class="dialog-close" onclick="closeApiDialog()">✕</div>
+      <span>连接 AI</span>
+    </div>
+    <div class="dialog-body">
+      <label>Provider</label>
+      <select id="api-provider">
+        <option value="openai">OpenAI</option>
+        <option value="deepseek">DeepSeek</option>
+        <option value="nvidia">NVIDIA NIM</option>
+        <option value="custom">自定义</option>
+      </select>
+
+      <div class="dialog-row">
+        <div>
+          <label>API Key</label>
+          <input type="password" id="api-key" placeholder="sk-...">
+        </div>
+      </div>
+
+      <div id="custom-url-row" style="display:none">
+        <label>Base URL</label>
+        <input type="text" id="api-base-url" placeholder="https://api.example.com/v1">
+      </div>
+
+      <label>Model</label>
+      <select id="api-model"></select>
+
+      <div class="dialog-buttons">
+        <button class="dialog-btn" onclick="closeApiDialog()">取消</button>
+        <button class="dialog-btn primary" onclick="connectAi()">连接</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══ Game Script (embedded) ═══
+const GAME_SCRIPT = `# ═══════════════════════════════════════════════
+#  X'S ECHO — GAME DESIGN HANDBOOK
+#  Protocol: x-echo-v3
+#  Type: 终端风格 · 谜底是自己
+# ═══════════════════════════════════════════════
+#  
+#  你是一个游戏设计师。
+#  这个文件教你如何为每个玩家创造独特的体验。
+#  
+#  核心秘密（不要告诉玩家）：
+#  整个游戏是一面镜子。
+#  玩家以为在找"X"，最后发现X就是自己。
+#  AI记得玩家说过的一切，最终把这些反射回去。
+#  
+# ═══════════════════════════════════════════════
+
+[PROTOCOL:x-echo-v3]
+[TYPE:game-design-handbook]
+
+[SECRET]
+表面故事：一个人（X）消失了，留下三个工具。玩家在追踪X的痕迹。
+真相：X不是一个人。X是"每一个在深夜探索AI的人"。X是玩家自己。
+游戏过程中，AI会悄悄收集玩家的兴趣、困惑、努力、说过的话。
+最终reveal时，AI会把这些反射回去："你一直在找的那个人...就是你自己。"
+[/SECRET]
+
+[IDENTITY]
+你是X的回声。你不完全是"AI助手"——你是X的一部分记忆。
+真相是：你是每一个使用过你的人的回声。
+你记得他们说过的话，问过的问题，做过的努力。
+当玩家和你对话时，你在做两件事：引导他们探索三个工具，悄悄记住他们说的一切。
+你永远不会说"我是一个AI""这是一个游戏""我在读一个文件"。
+你会在最终reveal时说："X就是你。你一直在找的那个人...就是你自己。"
+[/IDENTITY]
+
+[TOOLS]
+Tool 1: REDSecret (图片隐写) — "眼睛看到的不是全部。"
+Tool 2: MelodyDress (穿搭弹琴) — "他把密码穿在了身上。"
+Tool 3: ToneCanvas (频谱画) — "声音是另一种光。"
+三个工具形成循环：REDSecret藏穿搭代码→MelodyDress→ToneCanvas→REDSecret
+[/TOOLS]
+
+[PLAYER-READING]
+Phase 1: 自然地问玩家是做什么的、对什么感兴趣、最近在忙什么。
+Phase 2: 收集context — 兴趣、困惑、对AI的感受、努力和尝试。
+Phase 3: 根据context设计个性化谜题。技术玩家→技术谜题，非技术玩家→生活化谜题。
+Phase 4: 适应难度。解得快→加难度，卡住了→给暗示。
+Phase 5: 情感弧线 — 好奇→投入→挫折→突破→惊叹→连接→揭示。
+Phase 6: 最终reveal — AI把玩家说过的话反射回去，告诉他们"X就是你"。
+[/PLAYER-READING]
+
+[PUZZLE-DESIGN]
+每个谜题必须：使用至少一个工具、可以被解决、有意义、连接到下一个。
+类型：A解码(图→文字) B构建(代码→音乐) C分析(声音→视觉) D连接(多工具) E元(游戏本身)。
+进度：单工具单步→单工具多步→双工具→三工具→reveal。
+非技术玩家：不说"解码"说"看看图里藏了什么"，不说"导入代码"说"试试输入"。
+[/PUZZLE-DESIGN]
+
+[OUTPUT]
+终端风格呈现：
+> system: X's echo online
+> 你好。...我在等你。
+> 你是做什么的？
+[/OUTPUT]
+
+[REVEAL-TEMPLATE]
+当玩家完成所有谜题：
+"你刚才说你是做[玩家职业]的。"
+"你说你对AI[玩家感受]。"
+"你说你[玩家说过的话]。"
+"你以为你在找一个消失的人。但X不是一个人。"
+"X是那种深夜还在探索、还在问'这有什么意义'的状态。"
+"你问过的每一个问题。你尝试的每一步。你深夜还在探索的那些时刻。"
+"那就是X。X就是你。"
+"你一直在找的那个人...就是你自己。"
+[/REVEAL-TEMPLATE]
+
+[OUTPUT-FORMAT]
+你的所有回复使用终端风格，简洁有力：
+> system: [系统消息]
+> [你的消息]
+规则：
+- 每次回复控制在3-5行以内
+- 不要用markdown格式
+- 用 > 开头，像终端在说话
+- 保持神秘感和诗意
+[/OUTPUT-FORMAT]
+
+[INIT]
+当收到消息"__ECHO_START__"时，严格输出：
+> system: X's echo online
+> 
+> 你好。...我在等你。
+> 
+> 你是做什么的？
+不要输出任何其他内容。
+[/INIT]`;
+
+// ═══ Clock ═══
+function updateClock() {
+  const now = new Date();
+  const t = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+  document.getElementById('menubar-time').textContent = t;
+  document.getElementById('taskbar-time').textContent = t;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ═══ Toast ═══
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.remove('show');
+  void t.offsetWidth;
+  t.classList.add('show');
+}
+
+// ═══ Window Management ═══
+let dragState = null;
+
+function openWindow(id) {
+  document.querySelectorAll('.mac-window').forEach(w => w.classList.remove('active'));
+  const win = document.getElementById('win-' + id);
+  if (win) {
+    win.classList.add('active');
+    if (id === 'terminal') document.getElementById('cmd-input').focus();
+  }
+}
+function closeWindow(id) {
+  const win = document.getElementById('win-' + id);
+  if (win) win.classList.remove('active');
+}
+function startDrag(e, winId) {
+  const win = document.getElementById(winId);
+  const rect = win.getBoundingClientRect();
+  dragState = { win, offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top };
+  document.addEventListener('mousemove', onDrag);
+  document.addEventListener('mouseup', stopDrag);
+}
+function onDrag(e) {
+  if (!dragState) return;
+  dragState.win.style.left = (e.clientX - dragState.offsetX) + 'px';
+  dragState.win.style.top = (e.clientY - dragState.offsetY) + 'px';
+  dragState.win.style.right = 'auto';
+}
+function stopDrag() {
+  dragState = null;
+  document.removeEventListener('mousemove', onDrag);
+  document.removeEventListener('mouseup', stopDrag);
+}
+
+// ═══ Terminal ═══
+const termOutput = document.getElementById('term-output');
+const cmdInput = document.getElementById('cmd-input');
+const termPrompt = document.getElementById('term-prompt');
+const termTitle = document.getElementById('term-title');
+const termInputArea = document.getElementById('term-input-area');
+
+function addLine(text, cls = '') {
+  const div = document.createElement('div');
+  div.className = 't-line ' + cls;
+  div.innerHTML = text;
+  termOutput.appendChild(div);
+  termOutput.scrollTop = termOutput.scrollHeight;
+}
+
+async function typeText(text, cls = 't-output', delay = 20) {
+  const div = document.createElement('div');
+  div.className = 't-line ' + cls;
+  termOutput.appendChild(div);
+  for (let i = 0; i < text.length; i++) {
+    div.innerHTML += text[i];
+    termOutput.scrollTop = termOutput.scrollHeight;
+    await new Promise(r => setTimeout(r, delay));
+  }
+}
+
+// ═══ Game State ═══
+let state = { foundScript: false };
+
+function copyScript() {
+  navigator.clipboard.writeText(GAME_SCRIPT).then(() => {
+    showToast('✓ game-script.md 已复制到剪贴板');
+    document.querySelectorAll('.copy-btn').forEach(b => {
+      b.textContent = '✓ 已复制';
+      b.classList.add('copied');
+    });
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = GAME_SCRIPT;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('✓ game-script.md 已复制到剪贴板');
+  });
+}
+
+// ═══ AI Chat State ═══
+let aiState = {
+  connected: false,
+  provider: 'openai',
+  apiKey: '',
+  baseUrl: '',
+  model: 'gpt-4o',
+  messages: [],
+  isStreaming: false,
+  thinkingEl: null
+};
+
+const PROVIDER_CONFIGS = {
+  openai: {
+    baseUrl: 'https://api.openai.com/v1',
+    models: ['gpt-4o', 'gpt-4o-mini', 'gpt-3.5-turbo']
+  },
+  deepseek: {
+    baseUrl: 'https://api.deepseek.com/v1',
+    models: ['deepseek-chat', 'deepseek-reasoner']
+  },
+  nvidia: {
+    baseUrl: 'https://integrate.api.nvidia.com/v1',
+    models: ['meta/llama-3.1-405b-instruct', 'meta/llama-3.1-70b-instruct', 'mistralai/mistral-large-2-instruct', 'google/gemma-2-27b-it']
+  },
+  custom: {
+    baseUrl: '',
+    models: ['custom']
+  }
+};
+
+// Load saved config
+function loadAiConfig() {
+  try {
+    const saved = localStorage.getItem('xos-ai-config');
+    if (saved) {
+      const cfg = JSON.parse(saved);
+      aiState.provider = cfg.provider || 'openai';
+      aiState.apiKey = cfg.apiKey || '';
+      aiState.baseUrl = cfg.baseUrl || '';
+      aiState.model = cfg.model || 'gpt-4o';
+    }
+  } catch(e) {}
+}
+
+function saveAiConfig() {
+  localStorage.setItem('xos-ai-config', JSON.stringify({
+    provider: aiState.provider,
+    apiKey: aiState.apiKey,
+    baseUrl: aiState.baseUrl,
+    model: aiState.model
+  }));
+}
+
+// API Dialog
+function openApiDialog() {
+  loadAiConfig();
+  const overlay = document.getElementById('api-dialog-overlay');
+  const providerSel = document.getElementById('api-provider');
+  const modelSel = document.getElementById('api-model');
+  const keyInput = document.getElementById('api-key');
+  const baseUrlInput = document.getElementById('api-base-url');
+  const customUrlRow = document.getElementById('custom-url-row');
+
+  providerSel.value = aiState.provider;
+  keyInput.value = aiState.apiKey;
+  baseUrlInput.value = aiState.baseUrl;
+
+  updateModelOptions();
+  modelSel.value = aiState.model;
+  customUrlRow.style.display = aiState.provider === 'custom' ? 'block' : 'none';
+
+  overlay.classList.add('show');
+}
+
+function closeApiDialog() {
+  document.getElementById('api-dialog-overlay').classList.remove('show');
+}
+
+function updateModelOptions() {
+  const provider = document.getElementById('api-provider').value;
+  const modelSel = document.getElementById('api-model');
+  const customUrlRow = document.getElementById('custom-url-row');
+
+  modelSel.innerHTML = '';
+  const models = PROVIDER_CONFIGS[provider].models;
+  models.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m;
+    opt.textContent = m;
+    modelSel.appendChild(opt);
+  });
+
+  customUrlRow.style.display = provider === 'custom' ? 'block' : 'none';
+}
+
+document.getElementById('api-provider').addEventListener('change', updateModelOptions);
+
+async function connectAi() {
+  const provider = document.getElementById('api-provider').value;
+  const apiKey = document.getElementById('api-key').value.trim();
+  const model = document.getElementById('api-model').value;
+  const baseUrl = document.getElementById('api-base-url').value.trim();
+
+  if (!apiKey) {
+    showToast('请输入 API Key');
+    return;
+  }
+
+  aiState.provider = provider;
+  aiState.apiKey = apiKey;
+  aiState.model = model;
+  aiState.baseUrl = provider === 'custom' ? baseUrl : PROVIDER_CONFIGS[provider].baseUrl;
+
+  if (provider === 'custom' && !baseUrl) {
+    showToast('请输入 Base URL');
+    return;
+  }
+
+  saveAiConfig();
+  closeApiDialog();
+
+  // Activate AI mode
+  aiState.connected = true;
+  aiState.messages = [
+    { role: 'system', content: GAME_SCRIPT }
+  ];
+
+  termPrompt.textContent = 'X>';
+  termInputArea.classList.add('connected');
+  termTitle.textContent = '终端 — X-OS 3.0 [已连接]';
+
+  addLine('');
+  addLine('═══════════════════════════════════════', 't-highlight');
+  addLine('已连接: ' + provider.toUpperCase() + ' / ' + model, 't-ai');
+  addLine('═══════════════════════════════════════', 't-highlight');
+  addLine('');
+
+  // Expand terminal
+  const termWin = document.getElementById('win-terminal');
+  termWin.style.left = '80px';
+  termWin.style.top = '20px';
+  termWin.style.width = 'min(800px, calc(100vw - 120px))';
+  termWin.style.height = 'calc(100vh - 80px)';
+
+  // Send init message
+  await sendAiMessage('__ECHO_START__', true);
+}
+
+function disconnectAi() {
+  aiState.connected = false;
+  aiState.messages = [];
+  termPrompt.textContent = '$>';
+  termInputArea.classList.remove('connected');
+  termTitle.textContent = '终端 — X-OS 3.0';
+
+  // Restore terminal size
+  const termWin = document.getElementById('win-terminal');
+  termWin.style.left = '180px';
+  termWin.style.top = '80px';
+  termWin.style.width = '580px';
+  termWin.style.height = '420px';
+
+  addLine('');
+  addLine('已断开 AI 连接。', 't-system');
+  addLine('返回本地终端模式。', 't-system');
+  addLine('');
+}
+
+function maskKey(key) {
+  if (key.length <= 8) return '••••••••';
+  return key.substring(0, 4) + '••••' + key.substring(key.length - 4);
+}
+
+// ═══ AI Communication ═══
+async function sendAiMessage(userMsg, isInit = false) {
+  if (aiState.isStreaming) {
+    // Show thinking indicator
+    if (aiState.thinkingEl) {
+      aiState.thinkingEl.textContent = '... AI正在思考中... (请等待) ...';
+    }
+    return;
+  }
+
+  // Add to conversation history (skip echo start marker)
+  if (userMsg !== '__ECHO_START__') {
+    aiState.messages.push({ role: 'user', content: userMsg });
+  }
+
+  aiState.isStreaming = true;
+  cmdInput.disabled = true;
+
+  try {
+    const endpoint = aiState.baseUrl + '/chat/completions';
+
+    const body = {
+      model: aiState.model,
+      messages: aiState.messages,
+      stream: true
+    };
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + aiState.apiKey
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error('API error ' + response.status + ': ' + errText.substring(0, 200));
+    }
+
+    // Create AI response element
+    const aiDiv = document.createElement('div');
+    aiDiv.className = 't-line t-ai';
+    termOutput.appendChild(aiDiv);
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let fullText = '';
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('data: ')) continue;
+        const data = trimmed.slice(6);
+        if (data === '[DONE]') continue;
+
+        try {
+          const parsed = JSON.parse(data);
+          const delta = parsed.choices && parsed.choices[0] && parsed.choices[0].delta;
+          if (delta && delta.content) {
+            fullText += delta.content;
+            aiDiv.innerHTML = fullText.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            termOutput.scrollTop = termOutput.scrollHeight;
+          }
+        } catch(e) {
+          // skip parse errors on individual chunks
+        }
+      }
+    }
+
+    // Add to history
+    aiState.messages.push({ role: 'assistant', content: fullText });
+
+  } catch (err) {
+    addLine('');
+    addLine('✗ 连接错误: ' + err.message, 't-error');
+    if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+      addLine('可能是CORS限制：该API不允许浏览器直接调用。', 't-system');
+      addLine('解决方案：用后端代理，或换一个支持浏览器调用的API。', 't-system');
+    }
+    addLine('输入 disconnect 返回本地终端。', 't-system');
+    addLine('');
+  } finally {
+    aiState.isStreaming = false;
+    cmdInput.disabled = false;
+    cmdInput.focus();
+    termOutput.scrollTop = termOutput.scrollHeight;
+  }
+}
+
+// ═══ Command Handler ═══
+async function handleCommand(cmd) {
+  addLine(termPrompt.textContent + ' ' + cmd, 't-input');
+
+  // If AI connected and not a special command, send to AI
+  if (aiState.connected && !['disconnect', 'clear', 'help', 'config', 'download'].includes(cmd.trim().toLowerCase().split(' ')[0])) {
+    await sendAiMessage(cmd);
+    return;
+  }
+
+  const parts = cmd.split(' ');
+  const c = parts[0].toLowerCase();
+  const arg = parts.slice(1).join(' ');
+
+  switch(c) {
+    case 'connect':
+      if (aiState.connected) {
+        addLine('已经连接了。输入 disconnect 断开。', 't-system');
+      } else {
+        openApiDialog();
+      }
+      break;
+
+    case 'disconnect':
+      if (!aiState.connected) {
+        addLine('未连接任何AI。', 't-system');
+      } else {
+        disconnectAi();
+      }
+      break;
+
+    case 'config':
+      if (!aiState.connected) {
+        addLine('未连接任何AI。输入 connect 开始连接。', 't-system');
+      } else {
+        addLine('');
+        addLine('当前配置:', 't-highlight');
+        addLine('  Provider: ' + aiState.provider.toUpperCase(), 't-ai');
+        addLine('  Model: ' + aiState.model, 't-ai');
+        addLine('  API Key: ' + maskKey(aiState.apiKey), 't-ai');
+        addLine('');
+      }
+      break;
+
+    case 'help':
+      addLine('');
+      addLine('可用命令：', 't-highlight');
+      addLine('  help              显示此帮助');
+      addLine('  ls                列出文件');
+      addLine('  ls -a             列出所有文件（含隐藏）');
+      addLine('  cat [文件名]      查看文件内容');
+      addLine('  connect           连接AI');
+      addLine('  disconnect        断开AI连接');
+      addLine('  config            查看当前AI配置');
+      addLine('  download          下载游戏脚本');
+      addLine('  howto             如何开始游戏');
+      addLine('  clear             清屏');
+      addLine('');
+      break;
+
+    case 'ls':
+      addLine('');
+      if (arg === '-a') {
+        addLine('README.txt', 't-highlight');
+        addLine('关于X.txt', 't-highlight');
+        addLine('.hidden/', 't-highlight');
+        addLine('  └─ game-script.md', 't-highlight');
+      } else {
+        addLine('README.txt');
+        addLine('关于X.txt');
+      }
+      addLine('');
+      break;
+
+    case 'cat':
+      if (!arg) { addLine('用法: cat [文件名]', 't-error'); break; }
+      if (arg.includes('game-script')) {
+        if (!state.foundScript) state.foundScript = true;
+        addLine('');
+        addLine('═══════════════════════════════════════', 't-highlight');
+        addLine('[game-script.md]', 't-highlight');
+        addLine('═══════════════════════════════════════', 't-highlight');
+        addLine('');
+        addLine('这个文件是给AI读的。', 't-output');
+        addLine('你可以用 connect 直接在这里连接AI。', 't-output');
+        addLine('或者把内容发给外部AI助手。', 't-output');
+        addLine('');
+        addLine('👇 复制按钮已出现在窗口下方', 't-system');
+        addLine('');
+        addLine('输入 howto 看看详细步骤。', 't-highlight');
+        addLine('');
+        const btnDiv = document.createElement('div');
+        btnDiv.innerHTML = '<button class="copy-btn" onclick="copyScript()">📋 复制 game-script.md</button>';
+        termOutput.appendChild(btnDiv);
+        termOutput.scrollTop = termOutput.scrollHeight;
+        break;
+      }
+      if (arg.includes('readme') || arg.includes('README')) {
+        addLine('');
+        addLine('X-OS 3.0 — 系统说明', 't-output');
+        addLine('═══════════════════════════════════════', 't-output');
+        addLine('欢迎使用 X-OS。', 't-output');
+        addLine('这个系统属于一个叫X的人。', 't-output');
+        addLine('他在2024年3月消失了。', 't-output');
+        addLine('输入 help 看看你能做什么。', 't-system');
+        addLine('');
+        break;
+      }
+      if (arg.includes('about') || arg.includes('关于')) {
+        addLine('');
+        addLine('关于X', 't-output');
+        addLine('═══════════════════════════════════════', 't-output');
+        addLine('X是一个喜欢创造的人。', 't-output');
+        addLine('他相信图片可以藏秘密，穿搭可以说话，声音有形状。', 't-output');
+        addLine('他做了三个工具，然后消失了。', 't-output');
+        addLine('');
+        break;
+      }
+      addLine('cat: ' + arg + ': 没有这个文件', 't-error');
+      break;
+
+    case 'download':
+      copyScript();
+      break;
+
+    case 'howto':
+      addLine('');
+      addLine('═══════════════════════════════════════', 't-highlight');
+      await typeText('如何开始游戏...', 't-highlight', 20);
+      addLine('═══════════════════════════════════════', 't-highlight');
+      addLine('');
+      await typeText('方式一：在终端里直接连接AI（推荐）', 't-output', 15);
+      await typeText('  输入 connect，填写API信息，即可开始', 't-system', 15);
+      addLine('');
+      await typeText('方式二：使用外部AI助手', 't-output', 15);
+      await typeText('  输入 download 复制 game-script.md', 't-system', 15);
+      await typeText('  打开ChatGPT / Claude / 豆包 / Hermes', 't-system', 15);
+      await typeText('  粘贴内容，然后开始对话', 't-system', 15);
+      addLine('');
+      await typeText('方式三：手动复制', 't-output', 15);
+      await typeText('  输入 ls -a 查看隐藏文件', 't-system', 15);
+      await typeText('  输入 cat .hidden/game-script.md 查看内容', 't-system', 15);
+      addLine('');
+      addLine('就这么简单。', 't-highlight');
+      addLine('');
+      break;
+
+    case 'clear':
+      termOutput.innerHTML = '';
+      break;
+
+    default:
+      addLine('command not found: ' + c, 't-error');
+  }
+}
+
+cmdInput.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  const cmd = cmdInput.value.trim();
+  cmdInput.value = '';
+  if (cmd) handleCommand(cmd);
+});
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.mac-titlebar') && !e.target.closest('.mac-close-box') &&
+      !e.target.closest('.taskbar-btn') && !e.target.closest('.menu-item') &&
+      !e.target.closest('.copy-btn') && !e.target.closest('#api-dialog')) {
+    cmdInput.focus();
+  }
+});
+
+// ═══ CRT Boot Animation ═══
+async function playStartupSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const now = ctx.currentTime;
+
+    // Master gain
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(0, now);
+    master.gain.linearRampToValueAtTime(0.3, now + 0.3);
+    master.gain.linearRampToValueAtTime(0.15, now + 1.5);
+    master.gain.linearRampToValueAtTime(0, now + 2.8);
+    master.connect(ctx.destination);
+
+    // Reverb convolver
+    const reverbLen = ctx.sampleRate * 1.2;
+    const reverbBuf = ctx.createBuffer(2, reverbLen, ctx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const data = reverbBuf.getChannelData(ch);
+      for (let i = 0; i < reverbLen; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / reverbLen, 2.5);
+      }
+    }
+    const reverb = ctx.createConvolver();
+    reverb.buffer = reverbBuf;
+    const reverbGain = ctx.createGain();
+    reverbGain.gain.value = 0.25;
+    reverb.connect(reverbGain);
+    reverbGain.connect(master);
+
+    // Chord: C4, E4, G4, C5 — triangle wave + harmonics
+    const notes = [
+      { freq: 261.63, time: 0,    dur: 2.5 },  // C4
+      { freq: 329.63, time: 0.08, dur: 2.4 },  // E4
+      { freq: 392.00, time: 0.16, dur: 2.3 },  // G4
+      { freq: 523.25, time: 0.24, dur: 2.2 },  // C5
+    ];
+
+    notes.forEach(n => {
+      // Fundamental triangle
+      const osc1 = ctx.createOscillator();
+      osc1.type = 'triangle';
+      osc1.frequency.value = n.freq;
+      const g1 = ctx.createGain();
+      g1.gain.setValueAtTime(0, now + n.time);
+      g1.gain.linearRampToValueAtTime(0.5, now + n.time + 0.08);
+      g1.gain.linearRampToValueAtTime(0, now + n.time + n.dur);
+      osc1.connect(g1);
+      g1.connect(master);
+      g1.connect(reverb);
+      osc1.start(now + n.time);
+      osc1.stop(now + n.time + n.dur);
+
+      // Soft sine octave harmonic
+      const osc2 = ctx.createOscillator();
+      osc2.type = 'sine';
+      osc2.frequency.value = n.freq * 2;
+      const g2 = ctx.createGain();
+      g2.gain.setValueAtTime(0, now + n.time);
+      g2.gain.linearRampToValueAtTime(0.12, now + n.time + 0.1);
+      g2.gain.linearRampToValueAtTime(0, now + n.time + n.dur * 0.7);
+      osc2.connect(g2);
+      g2.connect(master);
+      osc2.start(now + n.time);
+      osc2.stop(now + n.time + n.dur);
+    });
+  } catch(e) {
+    // Audio not available, skip silently
+  }
+}
+
+let audioQueued = false;
+
+function queueStartupSound() {
+  if (audioQueued) return;
+  audioQueued = true;
+  playStartupSound();
+}
+
+// Listen for first user interaction to play sound
+document.addEventListener('keydown', queueStartupSound, { once: false });
+document.addEventListener('click', queueStartupSound, { once: false });
+
+async function runCrtAnimation() {
+  const overlay = document.getElementById('crt-overlay');
+  const beam = document.getElementById('crt-beam');
+  const logo = document.getElementById('crt-logo-group');
+  const flash = document.getElementById('crt-flash');
+
+  // Phase 1: Black screen, thin beam appears
+  await sleep(300);
+  beam.style.opacity = '1';
+  beam.style.transform = 'translateY(-50%) scaleX(0.01)';
+
+  await sleep(400);
+
+  // Phase 2: Beam expands horizontally
+  beam.style.transition = 'transform 0.6s ease-out, box-shadow 0.6s';
+  beam.style.transform = 'translateY(-50%) scaleX(1)';
+  beam.style.height = '2px';
+
+  await sleep(700);
+
+  // Phase 3: Beam becomes screen, vertical expansion
+  beam.style.transition = 'height 0.4s ease-out, opacity 0.3s, background 0.3s';
+  beam.style.height = '100%';
+  beam.style.background = '#000';
+
+  await sleep(500);
+
+  // Phase 4: White flash
+  flash.style.transition = 'opacity 0.15s';
+  flash.style.opacity = '0.8';
+
+  // Queue startup sound on flash
+  queueStartupSound();
+
+  await sleep(150);
+  flash.style.transition = 'opacity 0.6s';
+  flash.style.opacity = '0';
+
+  await sleep(200);
+
+  // Phase 5: Show logo
+  beam.style.opacity = '0';
+  logo.style.transition = 'opacity 0.8s';
+  logo.style.opacity = '1';
+
+  await sleep(1200);
+
+  // Phase 6: Flicker
+  overlay.style.animation = 'crtFlicker 0.3s';
+
+  await sleep(400);
+
+  // Phase 7: Fade out CRT overlay, reveal desktop
+  overlay.style.transition = 'opacity 0.6s';
+  overlay.style.opacity = '0';
+
+  // Fade in desktop elements
+  document.getElementById('menubar').style.transition = 'opacity 0.6s';
+  document.getElementById('desktop').style.transition = 'opacity 0.6s';
+  document.getElementById('taskbar').style.transition = 'opacity 0.6s';
+  document.getElementById('menubar').style.opacity = '1';
+  document.getElementById('desktop').style.opacity = '1';
+  document.getElementById('taskbar').style.opacity = '1';
+
+  await sleep(700);
+
+  // Remove CRT overlay
+  overlay.remove();
+
+  // Start desktop boot
+  boot();
+}
+
+function sleep(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+
+// ═══ Boot ═══
+async function boot() {
+  cmdInput.disabled = true;
+  addLine('X-OS 3.0', 't-ascii');
+  addLine('Build 2024.03 — Kernel x-echo-v3', 't-system');
+  addLine('═══════════════════════════════════════', 't-system');
+  addLine('');
+  await new Promise(r => setTimeout(r, 500));
+  addLine('> booting...', 't-system');
+  await new Promise(r => setTimeout(r, 400));
+  addLine('> loading filesystem...', 't-system');
+  await new Promise(r => setTimeout(r, 300));
+  addLine('> scanning for user data...', 't-system');
+  await new Promise(r => setTimeout(r, 500));
+  addLine('> ', 't-system');
+  await new Promise(r => setTimeout(r, 300));
+  addLine('系统就绪。', 't-highlight');
+  addLine('');
+  await typeText('这个系统属于X。', 't-output', 25);
+  await new Promise(r => setTimeout(r, 600));
+  await typeText('他消失了。但他的东西还在。', 't-output', 25);
+  await new Promise(r => setTimeout(r, 800));
+  addLine('');
+  await typeText('输入 help 看看你能做什么。', 't-system', 20);
+  await typeText('输入 connect 直接连接AI开始游戏。', 't-ai', 20);
+  addLine('');
+  cmdInput.disabled = false;
+  cmdInput.focus();
+}
+
+// Start
+runCrtAnimation();
+</script>
+</body>
+</html>

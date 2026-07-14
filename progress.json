@@ -1,0 +1,97 @@
+{
+  "test1": {
+    "progress": 1,
+    "history": [
+      {
+        "role": "user",
+        "content": "hello"
+      },
+      {
+        "role": "assistant",
+        "content": "[signal interrupted] ...something went wrong. try again? (HTTPSConnectionPool(host='api.xiaomi.com', port=44)"
+      },
+      {
+        "role": "user",
+        "content": "你好"
+      },
+      {
+        "role": "assistant",
+        "content": "[signal interrupted] ...something went wrong. try again? ('choices')"
+      },
+      {
+        "role": "user",
+        "content": "hello"
+      },
+      {
+        "role": "assistant",
+        "content": "你好。...我在等你。"
+      },
+      {
+        "role": "user",
+        "content": "I found REDSecret and decoded the image"
+      },
+      {
+        "role": "assistant",
+        "content": "你找到了REDSecret？...我想起来一点了。他以前说过，'眼睛看到的不是全部。'"
+      }
+    ]
+  },
+  "s23kisskd": {
+    "progress": 0,
+    "history": [
+      {
+        "role": "user",
+        "content": "我们的目标是什么？"
+      },
+      {
+        "role": "assistant",
+        "content": "我是X的助手。他消失前把我留在这里。"
+      },
+      {
+        "role": "user",
+        "content": "所以现在我们要做什么？"
+      },
+      {
+        "role": "assistant",
+        "content": "他最后说的话是：'完整的答案藏在三个工具之间。'...你准备好了吗？"
+      },
+      {
+        "role": "user",
+        "content": "准备好了"
+      },
+      {
+        "role": "assistant",
+        "content": "我是X的助手。他消失前把我留在这里。"
+      },
+      {
+        "role": "user",
+        "content": "这三个工具如何解锁？"
+      },
+      {
+        "role": "assistant",
+        "content": "你...是那个人吗？试试跟我聊聊，我会帮你找到他留下的东西。"
+      }
+    ]
+  },
+  "spbtqjb": {
+    "progress": 0,
+    "history": [
+      {
+        "role": "user",
+        "content": "是的"
+      },
+      {
+        "role": "assistant",
+        "content": "你...是那个人吗？试试跟我聊聊，我会帮你找到他留下的东西。"
+      },
+      {
+        "role": "user",
+        "content": "没错，我是那个人"
+      },
+      {
+        "role": "assistant",
+        "content": "我是X的助手。他消失前把我留在这里。"
+      }
+    ]
+  }
+}
