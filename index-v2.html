@@ -651,22 +651,23 @@ body {
       <span class="mac-title-text">README</span>
     </div>
     <div class="notepad-bg">
-X-OS 3.0 — 系统说明
+钢穴·回声 — 系统说明
 ══════════════════════
 
-欢迎使用 X-OS。
+这是一个调查系统。
 
-这个系统属于一个叫X的人。
-他在2024年3月消失了。
-但他留下了这个系统，和一些...碎片。
+数字考古学家X一周前从钢穴中消失。
+他留下了三个数字仓库，里面藏着加密的碎片。
 
 使用方法：
-• 双击图标打开文件
-• 打开终端输入命令
-• 探索这个系统，你会发现一些东西
+• 在终端输入 help 查看可用命令
+• 输入 connect 连接AI助手
+• 按照助手的指引，逐步破解X留下的谜题
 
-提示：
-在终端输入 help 看看你能做什么。
+注意：助手受协议约束，不能直接告诉你答案。
+你需要自己去发现。
+
+输入 connect 开始调查。
     </div>
   </div>
 
@@ -684,19 +685,24 @@ X-OS 3.0 — 系统说明
 关于X
 ══════════════════════
 
-X是一个喜欢创造的人。
+X是一位数字考古学家。
+
+他在钢穴中研究古老的互联网遗迹——
+那些被遗忘的、加密的、藏在深处的信息。
 
 他相信：
 • 图片可以藏秘密
-• 穿搭可以说话
-• 声音有形状
+• 旋律可以编码信息
+• 声音的频谱里有另一个世界
 
-他做了三个工具：
-1. REDSecret — 图片隐写
-2. MelodyDress — 穿搭弹琴
-3. ToneCanvas — 频谱画
+一周前，X从钢穴中消失了。
+消失前，他在三个数字仓库中留下了碎片。
 
-然后，他消失了。
+有人说他在考验谁。
+有人说他找到了出口。
+有人说他从未离开。
+
+真相...需要你自己去发现。
     </div>
   </div>
 
@@ -944,28 +950,38 @@ function showToast(msg) {
 let dragState = null;
 
 function openWindow(id) {
-  document.querySelectorAll('.mac-window').forEach(w => w.classList.remove('active'));
   const win = document.getElementById('win-' + id);
-  if (win) {
-    win.classList.add('active');
+  if (!win) return;
+  const isVisible = win.classList.contains('active');
+  if (isVisible) {
+    // Already open — bring to front
+    win.style.zIndex = ++windowZIndex;
     if (id === 'terminal') document.getElementById('cmd-input').focus();
+    return;
   }
+  // Open window
+  win.classList.add('active');
+  win.style.zIndex = ++windowZIndex;
+  if (id === 'terminal') document.getElementById('cmd-input').focus();
   // Update dock indicators
+  updateDockIndicators();
+}
+function closeWindow(id) {
+  const win = document.getElementById('win-' + id);
+  if (win) win.classList.remove('active');
+  updateDockIndicators();
+}
+function updateDockIndicators() {
   document.querySelectorAll('.dock-item').forEach(d => {
-    if (d.dataset.window === id) {
+    const win = document.getElementById('win-' + d.dataset.window);
+    if (win && win.classList.contains('active')) {
       d.classList.add('active-dock');
     } else {
       d.classList.remove('active-dock');
     }
   });
 }
-function closeWindow(id) {
-  const win = document.getElementById('win-' + id);
-  if (win) win.classList.remove('active');
-  // Remove dock indicator
-  const dockItem = document.querySelector('.dock-item[data-window="' + id + '"]');
-  if (dockItem) dockItem.classList.remove('active-dock');
-}
+let windowZIndex = 10;
 function startDrag(e, winId) {
   const win = document.getElementById(winId);
   const rect = win.getBoundingClientRect();
@@ -1701,28 +1717,27 @@ function sleep(ms) {
 // ═══ Boot ═══
 async function boot() {
   cmdInput.disabled = true;
-  addLine('X-OS 3.0', 't-ascii');
-  addLine('Build 2024.03 — Kernel x-echo-v3', 't-system');
+  addLine('钢穴·回声', 't-ascii');
+  addLine('Caves of Steel — Echo Protocol', 't-system');
   addLine('═══════════════════════════════════════', 't-system');
   addLine('');
   await new Promise(r => setTimeout(r, 500));
-  addLine('> booting...', 't-system');
+  addLine('> initializing steel cavern...', 't-system');
   await new Promise(r => setTimeout(r, 400));
-  addLine('> loading filesystem...', 't-system');
+  addLine('> loading forensic tools...', 't-system');
   await new Promise(r => setTimeout(r, 300));
-  addLine('> scanning for user data...', 't-system');
+  addLine('> scanning for X activity...', 't-system');
   await new Promise(r => setTimeout(r, 500));
   addLine('> ', 't-system');
   await new Promise(r => setTimeout(r, 300));
   addLine('系统就绪。', 't-highlight');
   addLine('');
-  await typeText('这个系统属于X。', 't-output', 25);
+  await typeText('X失踪了。一周前，他从钢穴中消失。', 't-output', 25);
   await new Promise(r => setTimeout(r, 600));
-  await typeText('他消失了。但他的东西还在。', 't-output', 25);
+  await typeText('他留下了三个数字仓库...和一些碎片。', 't-output', 25);
   await new Promise(r => setTimeout(r, 800));
   addLine('');
-  await typeText('输入 help 看看你能做什么。', 't-system', 20);
-  await typeText('输入 connect 直接连接AI开始游戏。', 't-ai', 20);
+  await typeText('输入 connect 连接助手，开始调查。', 't-ai', 20);
   addLine('');
   cmdInput.disabled = false;
   cmdInput.focus();
